@@ -6,6 +6,9 @@ var ReactDOM = require('react-dom');
 
 var TabContainer = require('./tab.js').TabContainer;
 var Tab = require('./tab.js').Tab;
+var getProjects = require('./projects.js').getProjects;
+var ProjectCard = require('./projects.js').ProjectCard;
+var CardList = require('./projects.js').CardList;
 
 var emojicats = [':video_game:', // games
 ':construction:', // in progress
@@ -14,37 +17,67 @@ var emojicats = [':video_game:', // games
 ':skull:', // unfinished/prototype
 ':fire:' // featured
 ];
+/*
+ReactDOM.render(
+  <TabContainer id="header">
+    <Tab link="#home">Home</Tab>
+    <Tab link="#projects">Projects</Tab>
+    <Tab link="#links">Links</Tab>
+    <Tab link="#contact">Contact</Tab>
+  </TabContainer>,
+  document.getElementById('root')
+);
+*/
 
-ReactDOM.render(React.createElement(
-  'div',
-  { id: 'page' },
-  React.createElement(
-    TabContainer,
-    { id: 'header' },
-    React.createElement(
-      Tab,
-      { link: '#home' },
-      'Home'
-    ),
-    React.createElement(
-      Tab,
-      { link: '#projects' },
-      'Projects'
-    ),
-    React.createElement(
-      Tab,
-      { link: '#links' },
-      'Links'
-    ),
-    React.createElement(
-      Tab,
-      { link: '#contact' },
-      'Contact'
-    )
-  )
-), document.getElementById('root'));
+var sortCategories = function sortCategories(projects) {
+  var categories = {};
+  emojicats.forEach(function (category) {
+    categories[category] = projects.filter(function (project) {
+      return project.desc.indexOf(category) !== -1;
+    });
+  });
+  return categories;
+};
 
-},{"./tab.js":169,"react":167,"react-dom":2}],2:[function(require,module,exports){
+var project1Actions = [{ text: 'link', link: '#hello' }, { text: 'press', link: '#also' }];
+
+getProjects().then(function (data) {
+  var projects = data.map(function (repo) {
+    return { name: repo.name, link: repo.html_url, desc: repo.description };
+  });
+  var categories = sortCategories(projects);
+  var keys = Object.keys(categories);
+  var lists = keys.map(function (key) {
+    return React.createElement(
+      CardList,
+      { title: key, columns: '3' },
+      categories[key].map(function (project) {
+        return React.createElement(ProjectCard, { actions: project1Actions, text: project.desc, title: project.name, img: 'astro.png' });
+      })
+    );
+  });
+  ReactDOM.render(React.createElement(
+    'div',
+    null,
+    lists
+  ), document.getElementById('root'));
+});
+/*
+let project1Actions = [{text:'link', link:'#hello'}, {text:'press', link:'#also'}];
+
+ReactDOM.render(
+  <CardList columns="2">
+    <ProjectCard actions={project1Actions} text="lorem ipsum dolor sit amor more words wrap around width" title="hello world" img="astro.png"></ProjectCard>
+    <ProjectCard actions={project1Actions} text="lorem ipsum dolor sit amor more words wrap around width" title="hello world" img="astro.png"></ProjectCard>
+    <ProjectCard actions={project1Actions} text="lorem ipsum dolor sit amor more words wrap around width" title="hello world" img="astro.png"></ProjectCard>
+    <ProjectCard actions={project1Actions} text="lorem ipsum dolor sit amor more words wrap around width" title="hello world" img="astro.png"></ProjectCard>
+    <ProjectCard actions={project1Actions} text="lorem ipsum dolor sit amor more words wrap around width" title="hello world" img="astro.png"></ProjectCard>
+  </CardList>,
+  document.getElementById('root')
+);
+*/
+
+},{"./projects.js":169,"./tab.js":170,"react":167,"react-dom":2}],2:[function(require,module,exports){
 'use strict';
 
 module.exports = require('react/lib/ReactDOM');
@@ -19712,6 +19745,129 @@ process.chdir = function (dir) {
 process.umask = function() { return 0; };
 
 },{}],169:[function(require,module,exports){
+'use strict';
+
+// call github api
+
+var get = function get(url, responseType) {
+  var promise = new Promise(function (resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener('load', function () {
+      resolve(xhr.response);
+    });
+    xhr.addEventListener('error', function () {
+      reject();
+    });
+    if (responseType) {
+      xhr.responseType = responseType;
+    }
+    xhr.open('get', url);
+    xhr.send();
+  });
+  return promise;
+};
+
+module.exports.getProjects = function () {
+  return get('https://api.github.com/users/Objelisks/repos', 'json');
+};
+
+var Emoji = React.createClass({
+  displayName: 'Emoji',
+
+  render: function render() {
+    return React.createElement('img', { className: 'emoji', src: this.props.src });
+  }
+});
+
+var ProjectCard = React.createClass({
+  displayName: 'ProjectCard',
+
+  render: function render() {
+    var actions = this.props.actions.map(function (action) {
+      return React.createElement(
+        'div',
+        { className: 'card-action' },
+        React.createElement(
+          'a',
+          { href: action.link },
+          action.text
+        )
+      );
+    });
+    var text = this.props.text.split(':');
+    var emojiedText = text.map(function (str, i) {
+      return i % 2 === 0 ? str : React.createElement(Emoji, { src: './emojis/' + str + '.png' });
+    });
+    return React.createElement(
+      'div',
+      { className: 'project-card' },
+      React.createElement(
+        'h2',
+        { className: 'card-title' },
+        this.props.title
+      ),
+      React.createElement('img', { className: 'card-img', src: './img/' + this.props.img }),
+      React.createElement(
+        'div',
+        { className: 'card-footer' },
+        React.createElement(
+          'p',
+          { className: 'card-text' },
+          emojiedText
+        ),
+        React.createElement(
+          'div',
+          { className: 'card-actions' },
+          actions
+        )
+      )
+    );
+  }
+});
+
+module.exports.ProjectCard = ProjectCard;
+
+var CardList = React.createClass({
+  displayName: 'CardList',
+
+  render: function render() {
+    var _this = this;
+
+    var columns = [];
+    var columnChildren = [];
+    this.props.children.forEach(function (child, i) {
+      var col = i % _this.props.columns;
+      columnChildren[col] = columnChildren[col] === undefined ? [] : columnChildren[col];
+      columnChildren[col].push(child);
+    });
+    for (var i = 0; i < this.props.columns; i++) {
+      columns.push(React.createElement(
+        'div',
+        { className: 'card-column' },
+        columnChildren[i]
+      ));
+    }
+
+    return React.createElement(
+      'div',
+      null,
+      React.createElement(
+        'h1',
+        null,
+        this.props.title
+      ),
+      React.createElement(
+        'div',
+        { className: 'card-list' },
+        columns
+      )
+    );
+  }
+});
+
+module.exports.CardList = CardList;
+
+},{}],170:[function(require,module,exports){
 "use strict";
 
 var Tab = React.createClass({
